@@ -27,6 +27,7 @@ export default function Home() {
     dataVencimento: "",
   });
 
+  // Carregar e salvar no localStorage
   useEffect(() => {
     const data = localStorage.getItem("demandas");
     if (data) setDemandas(JSON.parse(data));
@@ -38,7 +39,7 @@ export default function Home() {
 
   function adicionar() {
     if (!form.solicitante || !form.descricao) {
-      alert("Preencha Solicitante e Descrição!");
+      alert("❌ Preencha Solicitante e Descrição!");
       return;
     }
 
@@ -53,7 +54,13 @@ export default function Home() {
     };
 
     setDemandas([nova, ...demandas]);
-    setForm({ solicitante: "", responsavel: "", descricao: "", status: "Iniciado", dataVencimento: "" });
+    setForm({
+      solicitante: "",
+      responsavel: "",
+      descricao: "",
+      status: "Iniciado",
+      dataVencimento: "",
+    });
   }
 
   function atualizarStatus(id: number, novoStatus: Status) {
@@ -90,20 +97,22 @@ export default function Home() {
     const mesAtual = hoje.getMonth();
     const anoAtual = hoje.getFullYear();
 
-    const concluidasMes = demandas.filter((d) => d.dataConclusao && 
-      new Date(d.dataConclusao).getMonth() === mesAtual && 
-      new Date(d.dataConclusao).getFullYear() === anoAtual).length;
+    const concluidasMes = demandas.filter((d) => {
+      if (!d.dataConclusao) return false;
+      const dt = new Date(d.dataConclusao);
+      return dt.getMonth() === mesAtual && dt.getFullYear() === anoAtual;
+    }).length;
 
     const emAberto = demandas.filter((d) => d.status !== "Concluído").length;
-    const atrasadas = demandas.filter((d) => 
-      d.status !== "Concluído" && d.dataVencimento && new Date(d.dataVencimento) < hoje
-    ).length;
+    const atrasadas = demandas.filter((d) => {
+      if (d.status === "Concluído" || !d.dataVencimento) return false;
+      return new Date(d.dataVencimento) < hoje;
+    }).length;
 
     return { total: demandas.length, emAberto, concluidasMes, atrasadas };
   }, [demandas]);
 
   function exportarCSV() {
-    // (mesma função de antes)
     const headers = ["Solicitante", "Responsável", "Descrição", "Status", "Criação", "Vencimento", "Conclusão"];
     const rows = demandas.map((d) => [
       d.solicitante,
@@ -115,82 +124,93 @@ export default function Home() {
       d.dataConclusao ? new Date(d.dataConclusao).toLocaleDateString("pt-BR") : "",
     ]);
 
-    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `demandas_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `demandas_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
   };
 
-  const getStatusColor = (status: Status) => {
-    if (status === "Concluído") return "bg-green-100 text-green-700";
-    if (status === "Em processo") return "bg-blue-100 text-blue-700";
-    return "bg-yellow-100 text-yellow-700";
+  const getStatusStyle = (status: Status) => {
+    if (status === "Concluído") return "bg-emerald-500 text-white";
+    if (status === "Em processo") return "bg-blue-500 text-white";
+    return "bg-amber-500 text-white";
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">🏢 Dashboard de Demandas</h1>
-
-        {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <div className="bg-white p-6 rounded-2xl shadow">
-            <p className="text-gray-500">Total de Demandas</p>
-            <p className="text-4xl font-bold mt-2">{relatorio.total}</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-950 text-white">
+      {/* Header com Avatar */}
+      <header className="border-b border-slate-700 bg-black/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img
+              src="https://i.imgur.com/2v6vL8K.jpeg" 
+              alt="Avatar"
+              className="w-12 h-12 rounded-full border-4 border-emerald-400 shadow-xl"
+            />
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Gestão de Demandas</h1>
+              <p className="text-slate-400 text-sm">Administração • Jonathan</p>
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow">
-            <p className="text-gray-500">Em Aberto</p>
-            <p className="text-4xl font-bold mt-2 text-orange-600">{relatorio.emAberto}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow">
-            <p className="text-gray-500">Concluídas este mês</p>
-            <p className="text-4xl font-bold mt-2 text-green-600">{relatorio.concluidasMes}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow">
-            <p className="text-gray-500">Atrasadas</p>
-            <p className="text-4xl font-bold mt-2 text-red-600">{relatorio.atrasadas}</p>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold">Demandas</h2>
-          <button 
+          <button
             onClick={exportarCSV}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg flex items-center gap-2"
+            className="bg-emerald-500 hover:bg-emerald-600 px-6 py-3 rounded-2xl font-medium flex items-center gap-2 transition-all"
           >
             📥 Exportar CSV
           </button>
         </div>
+      </header>
 
-        {/* Formulário */}
-        <div className="bg-white p-6 rounded-2xl shadow mb-8">
-          <h3 className="text-xl font-semibold mb-4">Nova Demanda</h3>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Cards do Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="bg-slate-800/70 border border-slate-600 rounded-3xl p-6">
+            <p className="text-slate-400">Total de Demandas</p>
+            <p className="text-5xl font-bold mt-3">{relatorio.total}</p>
+          </div>
+          <div className="bg-slate-800/70 border border-slate-600 rounded-3xl p-6">
+            <p className="text-slate-400">Em Aberto</p>
+            <p className="text-5xl font-bold mt-3 text-orange-400">{relatorio.emAberto}</p>
+          </div>
+          <div className="bg-slate-800/70 border border-slate-600 rounded-3xl p-6">
+            <p className="text-slate-400">Concluídas este mês</p>
+            <p className="text-5xl font-bold mt-3 text-emerald-400">{relatorio.concluidasMes}</p>
+          </div>
+          <div className="bg-slate-800/70 border border-red-500/40 rounded-3xl p-6">
+            <p className="text-slate-400">Atrasadas</p>
+            <p className="text-5xl font-bold mt-3 text-red-400">{relatorio.atrasadas}</p>
+          </div>
+        </div>
+
+        {/* Formulário Nova Demanda */}
+        <div className="bg-slate-800/70 border border-slate-600 rounded-3xl p-8 mb-10">
+          <h3 className="text-2xl font-semibold mb-6 text-emerald-400">➕ Nova Demanda</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input
               placeholder="Solicitante *"
               value={form.solicitante}
               onChange={(e) => setForm({ ...form, solicitante: e.target.value })}
-              className="border rounded-lg px-4 py-3"
+              className="bg-slate-900 border border-slate-600 rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500"
             />
             <input
               placeholder="Responsável"
               value={form.responsavel}
               onChange={(e) => setForm({ ...form, responsavel: e.target.value })}
-              className="border rounded-lg px-4 py-3"
+              className="bg-slate-900 border border-slate-600 rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500"
             />
             <input
               type="date"
               value={form.dataVencimento}
               onChange={(e) => setForm({ ...form, dataVencimento: e.target.value })}
-              className="border rounded-lg px-4 py-3"
+              className="bg-slate-900 border border-slate-600 rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500"
             />
             <select
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value as Status })}
-              className="border rounded-lg px-4 py-3"
+              className="bg-slate-900 border border-slate-600 rounded-2xl px-5 py-4 focus:outline-none focus:border-emerald-500"
             >
               <option value="Iniciado">Iniciado</option>
               <option value="Em processo">Em processo</option>
@@ -202,30 +222,30 @@ export default function Home() {
             placeholder="Descrição da demanda *"
             value={form.descricao}
             onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-            className="w-full mt-4 border rounded-lg px-4 py-3"
-            rows={3}
+            rows={4}
+            className="w-full mt-6 bg-slate-900 border border-slate-600 rounded-3xl px-5 py-4 focus:outline-none focus:border-emerald-500"
           />
 
           <button
             onClick={adicionar}
-            className="mt-4 bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-medium"
+            className="mt-6 bg-emerald-500 hover:bg-emerald-600 px-10 py-4 rounded-2xl font-semibold text-lg transition-all"
           >
-            ➕ Adicionar Demanda
+            Adicionar Demanda
           </button>
         </div>
 
         {/* Filtros */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <input
-            placeholder="🔎 Buscar demandas..."
+            placeholder="🔎 Buscar por nome, responsável ou descrição..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="flex-1 border rounded-lg px-5 py-3"
+            className="flex-1 bg-slate-900 border border-slate-600 rounded-2xl px-6 py-4 focus:outline-none focus:border-emerald-500"
           />
           <select
             value={filtroStatus}
             onChange={(e) => setFiltroStatus(e.target.value as "Todos" | Status)}
-            className="border rounded-lg px-5 py-3"
+            className="bg-slate-900 border border-slate-600 rounded-2xl px-6 py-4 focus:outline-none focus:border-emerald-500"
           >
             <option value="Todos">Todos os Status</option>
             <option value="Iniciado">Iniciado</option>
@@ -235,42 +255,42 @@ export default function Home() {
         </div>
 
         {/* Tabela */}
-        <div className="bg-white rounded-2xl shadow overflow-hidden">
+        <div className="bg-slate-800/70 border border-slate-600 rounded-3xl overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="text-left p-5">Solicitante</th>
-                <th className="text-left p-5">Responsável</th>
-                <th className="text-left p-5">Descrição</th>
-                <th className="text-left p-5">Vencimento</th>
-                <th className="text-left p-5">Status</th>
-                <th className="text-center p-5">Ações</th>
+              <tr className="bg-slate-900 border-b border-slate-700">
+                <th className="text-left p-6">Solicitante</th>
+                <th className="text-left p-6">Responsável</th>
+                <th className="text-left p-6">Descrição</th>
+                <th className="text-left p-6">Vencimento</th>
+                <th className="text-left p-6">Status</th>
+                <th className="text-center p-6">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtradas.map((d) => (
-                <tr key={d.id} className="border-t hover:bg-gray-50">
-                  <td className="p-5">{d.solicitante}</td>
-                  <td className="p-5">{d.responsavel || "-"}</td>
-                  <td className="p-5">{d.descricao}</td>
-                  <td className="p-5">
+                <tr key={d.id} className="border-t border-slate-700 hover:bg-slate-700/50 transition">
+                  <td className="p-6 font-medium">{d.solicitante}</td>
+                  <td className="p-6">{d.responsavel || "-"}</td>
+                  <td className="p-6">{d.descricao}</td>
+                  <td className="p-6">
                     {d.dataVencimento ? new Date(d.dataVencimento).toLocaleDateString("pt-BR") : "-"}
                   </td>
-                  <td className="p-5">
+                  <td className="p-6">
                     <select
                       value={d.status}
                       onChange={(e) => atualizarStatus(d.id, e.target.value as Status)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(d.status)}`}
+                      className={`px-5 py-2 rounded-2xl text-sm font-medium ${getStatusStyle(d.status)}`}
                     >
                       <option value="Iniciado">Iniciado</option>
                       <option value="Em processo">Em processo</option>
                       <option value="Concluído">Concluído</option>
                     </select>
                   </td>
-                  <td className="p-5 text-center">
+                  <td className="p-6 text-center">
                     <button
                       onClick={() => deletar(d.id)}
-                      className="text-red-600 hover:text-red-800 font-medium"
+                      className="text-red-500 hover:text-red-600 font-medium transition"
                     >
                       Excluir
                     </button>
@@ -281,7 +301,9 @@ export default function Home() {
           </table>
 
           {filtradas.length === 0 && (
-            <p className="text-center py-12 text-gray-500">Nenhuma demanda encontrada.</p>
+            <p className="text-center py-20 text-slate-500 text-lg">
+              Nenhuma demanda encontrada.
+            </p>
           )}
         </div>
       </div>
